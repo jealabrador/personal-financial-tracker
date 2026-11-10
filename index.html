@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanJAL Standing - Personal Finance & Goal Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- html2canvas CDN for visual export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        /* Printing & Capture utility tweaks */
+        .export-mode {
+            padding: 2rem !important;
+            background-color: #f8fafc !important;
+            width: 1200px !important;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        income: { DEFAULT: '#10b981', light: '#d1fae5', dark: '#047857' },
+                        expense: { DEFAULT: '#f43f5e', light: '#ffe4e6', dark: '#be123c' },
+                        investment: { DEFAULT: '#6366f1', light: '#e0e7ff', dark: '#4338ca' },
+                        savings: { DEFAULT: '#f59e0b', light: '#fef3c7', dark: '#b45309' },
+                        emergency: { DEFAULT: '#06b6d4', light: '#cffaff', dark: '#0e7490' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Main Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-tr from-emerald-500 to-indigo-600 p-2 rounded-xl text-white shadow-md">
+                    <i data-lucide="wallet" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">FinanJAL Standing</h1>
+                    <p class="text-xs text-slate-500 font-medium">Personal Finance & Goal Tracker</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <input type="file" id="import-json-input" accept=".json" onchange="importJSON(event)" class="hidden">
+                <button onclick="document.getElementById('import-json-input').click()" class="inline-flex items-center px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm">
+                    <i data-lucide="upload" class="w-4 h-4 mr-1.5 text-indigo-500"></i>
+                    Import JSON
+                </button>
+                <button onclick="exportJSON()" class="inline-flex items-center px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm">
+                    <i data-lucide="file-json" class="w-4 h-4 mr-1.5 text-amber-500"></i>
+                    Export JSON
+                </button>            
+                <button onclick="exportCSV()" class="inline-flex items-center px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm">
+                    <i data-lucide="download" class="w-4 h-4 mr-1.5 text-slate-500"></i>
+                    Export CSV
+                </button>
+                <button onclick="exportDashboardImage()" class="inline-flex items-center px-3 py-2 text-xs sm:text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-200">
+                    <i data-lucide="image" class="w-4 h-4 mr-1.5"></i>
+                    Export Report
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Container -->
+    <main id="dashboard-container" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        <!-- Filter and Summary Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
+            <div class="flex items-center space-x-2">
+                <i data-lucide="filter" class="w-5 h-5 text-indigo-500"></i>
+                <h2 class="text-base font-semibold text-slate-800">Overview</h2>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <select id="filter-month" onchange="renderDashboard()" class="text-sm bg-slate-50 border border-slate-300 text-slate-700 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5">
+                    <option value="ALL">All Time</option>
+                </select>
+                <button onclick="resetFilters()" class="text-xs font-medium text-slate-500 hover:text-indigo-600 underline px-2 py-1">
+                    Reset Filter
+                </button>
+            </div>
+        </div>
+
+        <!-- Metric Summary Cards Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden group hover:shadow-md transition">
+                <div class="absolute -right-3 -top-3 w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center transition-transform group-hover:scale-110">
+                    <i data-lucide="trending-up" class="w-8 h-8 text-emerald-500/80"></i>
+                </div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-emerald-600 mb-1">Total Income</p>
+                <h3 id="card-income" class="text-2xl font-bold text-slate-900">₱0.00</h3>
+                <p class="text-xs text-slate-400 mt-2">Salary, Dividends, Interest</p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden group hover:shadow-md transition">
+                <div class="absolute -right-3 -top-3 w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center transition-transform group-hover:scale-110">
+                    <i data-lucide="trending-down" class="w-8 h-8 text-rose-500/80"></i>
+                </div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-rose-600 mb-1">Total Expenses</p>
+                <h3 id="card-expense" class="text-2xl font-bold text-slate-900">₱0.00</h3>
+                <p class="text-xs text-slate-400 mt-2">Bills, CC, Insurance, House</p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm relative overflow-hidden group hover:shadow-md transition">
+                <div class="absolute -right-3 -top-3 w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center transition-transform group-hover:scale-110">
+                    <i data-lucide="pie-chart" class="w-8 h-8 text-indigo-500/80"></i>
+                </div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-indigo-600 mb-1">Investments</p>
+                <h3 id="card-investment" class="text-2xl font-bold text-slate-900">₱0.00</h3>
+                <p class="text-xs text-slate-400 mt-2">LTG, OGP, SGP, Mynt</p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden group hover:shadow-md transition">
+                <div class="absolute -right-3 -top-3 w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center transition-transform group-hover:scale-110">
+                    <i data-lucide="piggy-bank" class="w-8 h-8 text-amber-500/80"></i>
+                </div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-amber-600 mb-1">Savings Funds</p>
+                <h3 id="card-savings" class="text-2xl font-bold text-slate-900">₱0.00</h3>
+                <p class="text-xs text-slate-400 mt-2">Retirement, House, Gifts</p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-cyan-100 shadow-sm relative overflow-hidden group hover:shadow-md transition sm:col-span-2 lg:col-span-1">
+                <div class="absolute -right-3 -top-3 w-16 h-16 bg-cyan-50 rounded-full flex items-center justify-center transition-transform group-hover:scale-110">
+                    <i data-lucide="shield-check" class="w-8 h-8 text-cyan-500/80"></i>
+                </div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-cyan-600 mb-1">Emergency Fund</p>
+                <h3 id="card-emergency" class="text-2xl font-bold text-slate-900">₱0.00</h3>
+                <p class="text-xs text-slate-400 mt-2">Tier One & Tier Two</p>
+            </div>
+        </div>
+
+        <!-- Targets & Goal Trackers Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                            <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800">Investment Target</h3>
+                            <p class="text-xs text-slate-500">Target: 12.5% of Monthly Income</p>
+                        </div>
+                    </div>
+                    <span id="investment-target-badge" class="px-2.5 py-1 text-xs font-bold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">0%</span>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">Actual Contributed:</span>
+                        <span id="invested-amount-text" class="font-semibold text-slate-800">₱0.00</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">Monthly Target (12.5%):</span>
+                        <span id="investment-target-text" class="font-semibold text-slate-800">₱0.00</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                        <div id="investment-progress-bar" class="bg-gradient-to-r from-indigo-500 to-indigo-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <p id="investment-status-message" class="text-xs text-slate-500 italic text-right mt-1">Select a period or add income to view target.</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
+                            <i data-lucide="piggy-bank" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800">Savings Target</h3>
+                            <p class="text-xs text-slate-500">Target: 12.5% of Monthly Income</p>
+                        </div>
+                    </div>
+                    <span id="savings-target-badge" class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200">0%</span>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">Actual Contributed:</span>
+                        <span id="savings-amount-text" class="font-semibold text-slate-800">₱0.00</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">Monthly Target (12.5%):</span>
+                        <span id="savings-target-text" class="font-semibold text-slate-800">₱0.00</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                        <div id="savings-progress-bar" class="bg-gradient-to-r from-amber-500 to-amber-600 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <p id="savings-status-message" class="text-xs text-slate-500 italic text-right mt-1">Select a period or add income to view target.</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2.5 bg-cyan-50 text-cyan-600 rounded-xl">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-slate-800">Emergency Fund Target</h3>
+                            <p class="text-xs text-slate-500">Overall Goal: ₱223,950.00</p>
+                        </div>
+                    </div>
+                    <span id="emergency-target-badge" class="px-2.5 py-1 text-xs font-bold rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200">0%</span>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">Current Accumulated:</span>
+                        <span id="emergency-amount-text" class="font-semibold text-slate-800">₱0.00</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-slate-500">Target Goal:</span>
+                        <span class="font-semibold text-slate-800">₱223,950.00</span>
+                    </div>
+                    <div class="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden p-0.5 border border-slate-200">
+                        <div id="emergency-progress-bar" class="bg-gradient-to-r from-cyan-500 to-teal-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-500 pt-1">
+                        <span>Tier 1: <strong id="tier-one-total">₱0</strong></span>
+                        <span>Tier 2: <strong id="tier-two-total">₱0</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form and Charts Container Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- Left Panel: Transaction Input Form (Added id="form-card" for robust scrolling) -->
+            <div id="form-card" class="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-5">
+                <div class="flex items-center space-x-3 border-b border-slate-100 pb-4">
+                    <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                        <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                    </div>
+                    <h2 class="text-lg font-bold text-slate-800" id="form-title">Add New Transaction</h2>
+                </div>
+                <form id="transaction-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                    <input type="hidden" id="edit-id" value="">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Date</label>
+                        <input type="date" id="input-date" required class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Transaction Type</label>
+                        <select id="input-type" onchange="updateCategoryDropdown()" required class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+                            <option value="" disabled selected>Select Type</option>
+                            <option value="Income">Income</option>
+                            <option value="Expense">Expense</option>
+                            <option value="Investment Fund">Investment Fund</option>
+                            <option value="Savings Fund">Savings Fund</option>
+                            <option value="Emergency Fund">Emergency Fund</option>
+                        </select>
+                    </div>
+                    <div id="income-source-group" class="hidden">
+                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Deduct From Income Source</label>
+                        <select id="input-income-source" class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+                            <option value="" disabled selected>Select income source</option>
+                            <option value="Salary">Salary</option>
+                            <option value="Interest">Interest</option>
+                            <option value="Dividends">Dividends</option>
+                        </select>
+                        <p class="text-[11px] text-slate-400 mt-1">Selecting this will log a matching deduction line item.</p>
+                    </div>
+                    <div>
+                        <label id="category-label" class="block text-xs font-semibold uppercase text-slate-600 mb-1">Category / Source</label>
+                        <select id="input-category" required class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+                            <option value="" disabled selected>First choose a type above</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Amount</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 font-medium">₱</span>
+                            <input type="number" step="0.01" min="0.01" id="input-amount" placeholder="0.00" required class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2.5 pl-8 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Description</label>
+                        <input type="text" id="input-description" placeholder="e.g. Monthly Salary, Grocery bill" class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Remarks</label>
+                        <textarea id="input-remarks" rows="2" placeholder="Additional notes or references..." class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"></textarea>
+                    </div>
+                    <div class="flex items-center space-x-3 pt-2">
+                        <button type="submit" id="btn-submit" class="flex-1 inline-flex justify-center items-center py-2.5 px-4 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition">
+                            <i data-lucide="plus" class="w-4 h-4 mr-1.5"></i>
+                            Save Transaction
+                        </button>
+                        <button type="button" onclick="resetForm()" class="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition">
+                            Reset
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Right Panel: Dynamic Visualization Charts -->
+            <div class="lg:col-span-7 space-y-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="donut" class="w-5 h-5 text-indigo-500"></i>
+                            Category Distribution Breakdown
+                        </h3>
+                        <span class="text-xs text-slate-400">Donut Chart</span>
+                    </div>
+                    <div class="relative h-64 w-full flex items-center justify-center">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="bar-chart-3" class="w-5 h-5 text-emerald-500"></i>
+                            Financial Overview Bar Comparison
+                        </h3>
+                    </div>
+                    <div class="relative h-60 w-full">
+                        <canvas id="summaryBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Log Table Section -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800">Transaction History</h2>
+                    <p class="text-xs text-slate-500">Detailed list of recorded income, expenses, and funds</p>
+                </div>
+                
+                <!-- Table Search & Filters -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="search" class="w-4 h-4"></i>
+                        </div>
+                        <input type="text" id="table-search" onkeyup="renderTable()" placeholder="Search description..." class="pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-48 sm:w-64">
+                    </div>
+                    <!-- Description Filter Dropdown -->
+                    <select id="filter-description" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
+                        <option value="ALL">All Descriptions</option>
+                    </select>
+                    <select id="table-type-filter" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
+                        <option value="ALL">All Types</option>
+                        <option value="Income">Income</option>
+                        <option value="Expense">Expense</option>
+                        <option value="Investment Fund">Investment Fund</option>
+                        <option value="Savings Fund">Savings Fund</option>
+                        <option value="Emergency Fund">Emergency Fund</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Table Container -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-600">
+                    <thead class="bg-slate-50/80 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                        <tr>
+                            <th class="py-3.5 px-4">Date</th>
+                            <th class="py-3.5 px-4">Type</th>
+                            <th class="py-3.5 px-4">Category / Choice</th>
+                            <th class="py-3.5 px-4 text-right">Amount</th>
+                            <th class="py-3.5 px-4">Description</th>
+                            <th class="py-3.5 px-4">Remarks</th>
+                            <th class="py-3.5 px-4 text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transaction-table-body" class="divide-y divide-slate-100">
+                        <!-- Populated dynamically via Javascript -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Empty State Placeholder -->
+            <div id="empty-state" class="hidden p-12 text-center">
+                <div class="inline-flex p-3 bg-slate-100 rounded-full text-slate-400 mb-3">
+                    <i data-lucide="inbox" class="w-8 h-8"></i>
+                </div>
+                <h4 class="text-slate-700 font-semibold">No transactions found</h4>
+                <p class="text-xs text-slate-400 mt-1">Try adjusting your filters or add a new transaction above.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Custom Modal for Delete Confirmation -->
+    <div id="delete-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-xl border border-slate-100">
+            <div class="flex items-center space-x-3 text-rose-600">
+                <div class="p-2 bg-rose-50 rounded-xl">
+                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                </div>
+                <h3 class="font-bold text-slate-800 text-lg">Confirm Delete</h3>
+            </div>
+            <p class="text-sm text-slate-600">Are you sure you want to delete this transaction record? This action cannot be undone.</p>
+            <div class="flex space-x-3 pt-2">
+                <button onclick="closeDeleteModal()" class="flex-1 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">Cancel</button>
+                <button id="confirm-delete-btn" class="flex-1 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        const CATEGORY_MAP = {
+            'Income': ['Salary', 'Interest', 'Dividends'],
+            'Expense': ['Internet', 'Insurance', 'Credit Card', 'Electricity', 'House Contribution', 'Others'],
+            'Investment Fund': ['LTG', 'OGP', 'SGP', 'Mynt'],
+            'Savings Fund': ['Retirement & Wealth', 'House', 'Vacation', 'Gift'],
+            'Emergency Fund': ['Tier One', 'Tier Two']
+        };
+
+        const CHOICE_COLORS = {
+            'Income': { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300', hex: '#10b981' },
+            'Expense': { bg: 'bg-rose-100', text: 'text-rose-800', border: 'border-rose-300', hex: '#f43f5e' },
+            'Investment Fund': { bg: 'bg-indigo-100', text: 'text-indigo-800', border: 'border-indigo-300', hex: '#6366f1' },
+            'Savings Fund': { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-300', hex: '#f59e0b' },
+            'Emergency Fund': { bg: 'bg-cyan-100', text: 'text-cyan-800', border: 'border-cyan-300', hex: '#06b6d4' },
+            'Salary': { bg: 'bg-emerald-50', text: 'text-emerald-700', hex: '#34d399' },
+            'Interest': { bg: 'bg-teal-50', text: 'text-teal-700', hex: '#2dd4bf' },
+            'Dividends': { bg: 'bg-green-50', text: 'text-green-700', hex: '#4ade80' },
+            'Internet': { bg: 'bg-purple-50', text: 'text-purple-700', hex: '#c084fc' },
+            'Insurance': { bg: 'bg-sky-50', text: 'text-sky-700', hex: '#38bdf8' },
+            'Credit Card': { bg: 'bg-rose-50', text: 'text-rose-700', hex: '#fb7185' },
+            'Electricity': { bg: 'bg-yellow-50', text: 'text-yellow-700', hex: '#facc15' },
+            'House Contribution': { bg: 'bg-orange-50', text: 'text-orange-700', hex: '#fb923c' },
+            'Others': { bg: 'bg-slate-100', text: 'text-slate-700', hex: '#94a3b8' },
+            'LTG': { bg: 'bg-indigo-50', text: 'text-indigo-700', hex: '#818cf8' },
+            'OGP': { bg: 'bg-blue-50', text: 'text-blue-700', hex: '#60a5fa' },
+            'SGP': { bg: 'bg-violet-50', text: 'text-violet-700', hex: '#a78bfa' },
+            'Mynt': { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', hex: '#e879f9' },
+            'Retirement & Wealth': { bg: 'bg-amber-50', text: 'text-amber-700', hex: '#fbbf24' },
+            'House': { bg: 'bg-lime-50', text: 'text-lime-700', hex: '#a3e635' },
+            'Vacation': { bg: 'bg-teal-50', text: 'text-teal-700', hex: '#2dd4bf' },
+            'Gift': { bg: 'bg-pink-50', text: 'text-pink-700', hex: '#f472b6' },
+            'Tier One': { bg: 'bg-cyan-50', text: 'text-cyan-700', hex: '#22d3ee' },
+            'Tier Two': { bg: 'bg-teal-50', text: 'text-teal-800', hex: '#14b8a6' }
+        };
+
+        let transactions = [];
+        let pendingDeleteId = null;
+        let categoryChartInstance = null;
+        let summaryBarChartInstance = null;
+
+        const sampleData = [
+            { id: '1', date: '2026-10-01', type: 'Income', category: 'Salary', amount: 80000, description: 'Main Monthly Salary', remarks: 'Payroll Direct Deposit' },
+            { id: '2', date: '2026-10-05', type: 'Income', category: 'Dividends', amount: 4500, description: 'Quarterly Stock Dividend', remarks: 'Reinvested partially' },
+            { id: '3', date: '2026-10-06', type: 'Expense', category: 'Electricity', amount: 5200, description: 'Meralco Electric Bill', remarks: 'Paid via Mobile App' },
+            { id: '4', date: '2026-10-08', type: 'Expense', category: 'Internet', amount: 2499, description: 'Fiber Internet Subscription', remarks: 'Monthly Recurring' },
+            { id: '5', date: '2026-10-10', type: 'Investment Fund', category: 'LTG', amount: 5000, description: 'LTG Stock Allocation', remarks: 'Monthly target portfolio' },
+            { id: '6', date: '2026-10-10', type: 'Investment Fund', category: 'Mynt', amount: 5000, description: 'Fintech Holdings', remarks: 'Growth Fund' },
+            { id: '7', date: '2026-10-12', type: 'Emergency Fund', category: 'Tier One', amount: 150000, description: 'High Yield Savings Deposit', remarks: 'Liquid tier 1' },
+            { id: '8', date: '2026-10-14', type: 'Emergency Fund', category: 'Tier Two', amount: 45000, description: 'Time Deposit Allocation', remarks: '6-month Lock-in' },
+            { id: '9', date: '2026-10-15', type: 'Savings Fund', category: 'Retirement & Wealth', amount: 8000, description: 'Wealth accumulation fund', remarks: 'Long term' },
+            { id: '10', date: '2026-10-18', type: 'Savings Fund', category: 'Vacation', amount: 4000, description: 'Year-end Trip Savings', remarks: 'Beach Getaway' }
+        ];
+
+        window.onload = function() {
+            transactions = sampleData;
+            document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
+            populateMonthFilter();
+            populateDescriptionFilter();
+            renderDashboard();
+            lucide.createIcons();
+        };
+
+        function updateCategoryDropdown() {
+            const type = document.getElementById('input-type').value;
+            const categorySelect = document.getElementById('input-category');
+            const categoryLabel = document.getElementById('category-label');
+            const incomeSourceGroup = document.getElementById('income-source-group');
+            categorySelect.innerHTML = '';
+            if (!type || !CATEGORY_MAP[type]) {
+                categorySelect.innerHTML = '<option value="" disabled selected>Select a Type first</option>';
+                if (incomeSourceGroup) incomeSourceGroup.classList.add('hidden');                
+                return;
+            }
+            categoryLabel.textContent = `${type} Category`;
+            CATEGORY_MAP[type].forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                categorySelect.appendChild(opt);
+            });
+            
+            if (['Investment Fund', 'Savings Fund', 'Emergency Fund'].includes(type)) {
+                incomeSourceGroup.classList.remove('hidden');
+            } else {
+                incomeSourceGroup.classList.add('hidden');
+                document.getElementById('input-income-source').value = '';
+            }
+        }
+
+        function formatPHP(amount) {
+            return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount);
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('edit-id').value;
+            const date = document.getElementById('input-date').value;
+            const type = document.getElementById('input-type').value;
+            const category = document.getElementById('input-category').value;
+            const amount = parseFloat(document.getElementById('input-amount').value);
+            const description = document.getElementById('input-description').value.trim();
+            const remarks = document.getElementById('input-remarks').value.trim();
+            const incomeSource = document.getElementById('input-income-source').value;
+
+            if (!date || !type || !category || isNaN(amount) || amount <= 0) {
+                showToast('Please fill all required fields correctly.', 'error');
+                return;
+            }
+
+            const isFund = ['Investment Fund', 'Savings Fund', 'Emergency Fund'].includes(type);
+
+            if (editId) {
+                const index = transactions.findIndex(t => t.id === editId);
+                if (index !== -1) {
+                    const oldTransaction = transactions[index];
+                    let deductionId = oldTransaction.deductionId;
+
+                    if (isFund && incomeSource) {
+                        if (deductionId) {
+                            const dedIndex = transactions.findIndex(t => t.id === deductionId);
+                            if (dedIndex !== -1) {
+                                transactions[dedIndex] = {
+                                    ...transactions[dedIndex],
+                                    date,
+                                    category: incomeSource,
+                                    amount: -amount,
+                                    description: `Allocation: ${category} (Deducted from ${incomeSource})`,
+                                    remarks: `Source: ${incomeSource}`
+                                };
+                            } else {
+                                deductionId = (Date.now() + 1).toString();
+                                transactions.unshift({
+                                    id: deductionId,
+                                    date,
+                                    type: 'Income',
+                                    category: incomeSource,
+                                    amount: -amount,
+                                    description: `Allocation: ${category} (Deducted from ${incomeSource})`,
+                                    remarks: `Source: ${incomeSource}`
+                                });
+                            }
+                        } else {
+                            deductionId = (Date.now() + 1).toString();
+                            transactions.unshift({
+                                id: deductionId,
+                                date,
+                                type: 'Income',
+                                category: incomeSource,
+                                amount: -amount,
+                                description: `Allocation: ${category} (Deducted from ${incomeSource})`,
+                                remarks: `Source: ${incomeSource}`
+                            });
+                        }
+                    } else {
+                        if (deductionId) {
+                            transactions = transactions.filter(t => t.id !== deductionId);
+                            deductionId = null;
+                        }
+                    }
+
+                    transactions[index] = {
+                        id: editId,
+                        date,
+                        type,
+                        category,
+                        amount,
+                        description: description || category,
+                        remarks: remarks || '-',
+                        incomeSource: isFund ? incomeSource : undefined,
+                        deductionId: deductionId || undefined
+                    };
+                    showToast('Transaction and allocation updated successfully!', 'success');
+                }
+            } else {
+                const newId = Date.now().toString();
+                let deductionId = null;
+
+                if (isFund && incomeSource) {
+                    deductionId = (Date.now() + 1).toString();
+                    transactions.unshift({
+                        id: deductionId,
+                        date,
+                        type: 'Income',
+                        category: incomeSource,
+                        amount: -amount,
+                        description: `Allocation: ${category} (Deducted from ${incomeSource})`,
+                        remarks: `Source: ${incomeSource}`
+                    });
+                }
+
+                transactions.unshift({
+                    id: newId,
+                    date,
+                    type,
+                    category,
+                    amount,
+                    description: description || category,
+                    remarks: remarks || '-',
+                    incomeSource: isFund ? incomeSource : undefined,
+                    deductionId: deductionId || undefined
+                });
+                showToast('New transaction added successfully!', 'success');
+            }
+
+            resetForm();
+            populateMonthFilter();
+            populateDescriptionFilter();
+            renderDashboard();
+        }
+
+        function resetForm() {
+            document.getElementById('transaction-form').reset();
+            document.getElementById('edit-id').value = '';
+            document.getElementById('form-title').textContent = 'Add New Transaction';
+            document.getElementById('btn-submit').innerHTML = `<i data-lucide="plus" class="w-4 h-4 mr-1.5"></i> Save Transaction`;
+            document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('input-category').innerHTML = '<option value="" disabled selected>First choose a type above</option>';
+            document.getElementById('income-source-group').classList.add('hidden');
+            lucide.createIcons();
+        }
+
+        function populateMonthFilter() {
+            const monthSelect = document.getElementById('filter-month');
+            const currentValue = monthSelect.value;
+            const months = new Set();
+            transactions.forEach(t => {
+                if (t.date) months.add(t.date.substring(0, 7));
+            });
+            const sortedMonths = Array.from(months).sort().reverse();
+            
+            monthSelect.innerHTML = '<option value="ALL">All Time Summary</option>';
+            sortedMonths.forEach(m => {
+                const [year, month] = m.split('-');
+                const dateObj = new Date(year, month - 1);
+                const monthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = monthName;
+                monthSelect.appendChild(opt);
+            });
+            if (Array.from(monthSelect.options).some(o => o.value === currentValue)) {
+                monthSelect.value = currentValue;
+            }
+        }
+
+        function populateDescriptionFilter() {
+            const descSelect = document.getElementById('filter-description');
+            if (!descSelect) return;
+            const currentValue = descSelect.value;
+            const descriptions = [...new Set(transactions.map(t => t.description).filter(Boolean))].sort();
+            
+            descSelect.innerHTML = '<option value="ALL">All Descriptions</option>';
+            descriptions.forEach(desc => {
+                const opt = document.createElement('option');
+                opt.value = desc;
+                opt.textContent = desc;
+                if (desc === currentValue) opt.selected = true;
+                descSelect.appendChild(opt);
+            });
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-month').value = 'ALL';
+            document.getElementById('table-search').value = '';
+            document.getElementById('filter-description').value = 'ALL';
+            document.getElementById('table-type-filter').value = 'ALL';
+            renderDashboard();
+        }
+
+        function renderDashboard() {
+            const selectedMonth = document.getElementById('filter-month').value;
+            const filtered = selectedMonth === 'ALL' 
+                ? transactions 
+                : transactions.filter(t => t.date && t.date.startsWith(selectedMonth));
+
+            let totalIncome = 0, totalExpense = 0, totalInvestment = 0, totalSavings = 0, totalEmergency = 0;
+            let tierOneEmergency = 0, tierTwoEmergency = 0;
+
+            filtered.forEach(t => {
+                switch(t.type) {
+                    case 'Income': totalIncome += t.amount; break;
+                    case 'Expense': totalExpense += t.amount; break;
+                    case 'Investment Fund': totalInvestment += t.amount; break;
+                    case 'Savings Fund': totalSavings += t.amount; break;
+                    case 'Emergency Fund':
+                        totalEmergency += t.amount;
+                        if (t.category === 'Tier One') tierOneEmergency += t.amount;
+                        if (t.category === 'Tier Two') tierTwoEmergency += t.amount;
+                        break;
+                }
+            });
+
+            document.getElementById('card-income').textContent = formatPHP(totalIncome);
+            document.getElementById('card-expense').textContent = formatPHP(totalExpense);
+            document.getElementById('card-investment').textContent = formatPHP(totalInvestment);
+            document.getElementById('card-savings').textContent = formatPHP(totalSavings);
+            document.getElementById('card-emergency').textContent = formatPHP(totalEmergency);
+
+            const investmentTarget = totalIncome * 0.125;
+            const investProgress = investmentTarget > 0 ? Math.min((totalInvestment / investmentTarget) * 100, 100) : (totalInvestment > 0 ? 100 : 0);
+            document.getElementById('invested-amount-text').textContent = formatPHP(totalInvestment);
+            document.getElementById('investment-target-text').textContent = formatPHP(investmentTarget);
+            document.getElementById('investment-progress-bar').style.width = `${investProgress.toFixed(1)}%`;
+            document.getElementById('investment-target-badge').textContent = `${investProgress.toFixed(0)}% Target`;
+            if (investmentTarget === 0) {
+                document.getElementById('investment-status-message').textContent = 'Add income records to establish your 12.5% monthly goal.';
+            } else if (totalInvestment >= investmentTarget) {
+                document.getElementById('investment-status-message').textContent = '🎉 Monthly investment target achieved!';
+            } else {
+                const diff = investmentTarget - totalInvestment;
+                document.getElementById('investment-status-message').textContent = `₱${diff.toLocaleString('en-PH', {minimumFractionDigits:2})} more needed to hit 12.5% target.`;
+            }
+
+            const savingsTarget = totalIncome * 0.125;
+            const savingsProgress = savingsTarget > 0 ? Math.min((totalSavings / savingsTarget) * 100, 100) : (totalSavings > 0 ? 100 : 0);
+            document.getElementById('savings-amount-text').textContent = formatPHP(totalSavings);
+            document.getElementById('savings-target-text').textContent = formatPHP(savingsTarget);
+            document.getElementById('savings-progress-bar').style.width = `${savingsProgress.toFixed(1)}%`;
+            document.getElementById('savings-target-badge').textContent = `${savingsProgress.toFixed(0)}% Target`;
+            if (savingsTarget === 0) {
+                document.getElementById('savings-status-message').textContent = 'Add income records to establish your 12.5% monthly savings goal.';
+            } else if (totalSavings >= savingsTarget) {
+                document.getElementById('savings-status-message').textContent = '🎉 Monthly savings target achieved!';
+            } else {
+                const diff = savingsTarget - totalSavings;
+                document.getElementById('savings-status-message').textContent = `₱${diff.toLocaleString('en-PH', {minimumFractionDigits:2})} more needed to hit 12.5% target.`;
+            }
+
+            const EMERGENCY_TARGET = 223950;
+            const cumulativeEmergency = transactions
+                .filter(t => t.type === 'Emergency Fund')
+                .reduce((sum, t) => sum + t.amount, 0);
+            const emergencyProgress = Math.min((cumulativeEmergency / EMERGENCY_TARGET) * 100, 100);
+            document.getElementById('emergency-amount-text').textContent = formatPHP(cumulativeEmergency);
+            document.getElementById('emergency-progress-bar').style.width = `${emergencyProgress.toFixed(1)}%`;
+            document.getElementById('emergency-target-badge').textContent = `${emergencyProgress.toFixed(1)}%`;
+            document.getElementById('tier-one-total').textContent = formatPHP(tierOneEmergency);
+            document.getElementById('tier-two-total').textContent = formatPHP(tierTwoEmergency);
+
+            renderCharts(totalIncome, totalExpense, totalInvestment, totalSavings, totalEmergency, filtered);
+            renderTable();
+        }
+
+        function renderCharts(income, expense, investment, savings, emergency, filteredData) {
+            const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+            if (categoryChartInstance) categoryChartInstance.destroy();
+            categoryChartInstance = new Chart(categoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Income', 'Expenses', 'Investments', 'Savings', 'Emergency Fund'],
+                    datasets: [{
+                        data: [income, expense, investment, savings, emergency],
+                        backgroundColor: [
+                            CHOICE_COLORS['Income'].hex,
+                            CHOICE_COLORS['Expense'].hex,
+                            CHOICE_COLORS['Investment Fund'].hex,
+                            CHOICE_COLORS['Savings Fund'].hex,
+                            CHOICE_COLORS['Emergency Fund'].hex
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Inter', size: 12 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.label}: ₱${context.parsed.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+
+            const summaryCtx = document.getElementById('summaryBarChart').getContext('2d');
+            if (summaryBarChartInstance) summaryBarChartInstance.destroy();
+            const subCatMap = {};
+            filteredData.forEach(t => {
+                subCatMap[t.category] = (subCatMap[t.category] || 0) + t.amount;
+            });
+            const labels = Object.keys(subCatMap);
+            const values = Object.values(subCatMap);
+            const colors = labels.map(l => CHOICE_COLORS[l]?.hex || '#64748b');
+            summaryBarChartInstance = new Chart(summaryCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels.length > 0 ? labels : ['No Data'],
+                    datasets: [{
+                        label: 'Amount (₱)',
+                        data: values.length > 0 ? values : [0],
+                        backgroundColor: colors.length > 0 ? colors : ['#cbd5e1'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return ` Total: ₱${context.parsed.y.toLocaleString('en-PH', {minimumFractionDigits: 2})}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: function(val) { return '₱' + val.toLocaleString(); } }
+                        },
+                        x: { ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('transaction-table-body');
+            const emptyState = document.getElementById('empty-state');
+            const searchVal = document.getElementById('table-search').value.toLowerCase();
+            const typeVal = document.getElementById('table-type-filter').value;
+            const monthVal = document.getElementById('filter-month').value;
+            const descVal = document.getElementById('filter-description') ? document.getElementById('filter-description').value : 'ALL';
+            
+            tbody.innerHTML = '';
+            const filtered = transactions.filter(t => {
+                const matchesMonth = monthVal === 'ALL' || (t.date && t.date.startsWith(monthVal));
+                const matchesType = typeVal === 'ALL' || t.type === typeVal;
+                const matchesDesc = descVal === 'ALL' || t.description === descVal;
+                const matchesSearch = (t.description && t.description.toLowerCase().includes(searchVal)) ||
+                                      (t.remarks && t.remarks.toLowerCase().includes(searchVal)) ||
+                                      (t.category && t.category.toLowerCase().includes(searchVal));
+                return matchesMonth && matchesType && matchesDesc && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            let subtotalAmount = 0;
+            const isDescFiltered = descVal !== 'ALL';
+            if (isDescFiltered) {
+                subtotalAmount = filtered.reduce((sum, t) => sum + t.amount, 0);
+            }
+
+            filtered.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/85 transition-colors';
+                const typeColor = CHOICE_COLORS[t.type] || { bg: 'bg-slate-100', text: 'text-slate-700' };
+                const subColor = CHOICE_COLORS[t.category] || { bg: 'bg-slate-100', text: 'text-slate-700' };
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono text-xs text-slate-500 whitespace-nowrap">${t.date}</td>
+                    <td class="py-3 px-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeColor.bg} ${typeColor.text}">
+                            ${t.type}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${subColor.bg} ${subColor.text}">
+                            ${t.category}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-right font-semibold text-slate-900 whitespace-nowrap">
+                        ${formatPHP(t.amount)}
+                    </td>
+                    <td class="py-3 px-4 text-slate-700 max-w-xs truncate">${escapeHTML(t.description || '-')}</td>
+                    <td class="py-3 px-4 text-slate-500 max-w-xs truncate text-xs">${escapeHTML(t.remarks || '-')}</td>
+                    <td class="py-3 px-4 text-center whitespace-nowrap">
+                        <div class="flex items-center justify-center space-x-2">
+                            <button onclick="editTransaction('${t.id}')" class="p-1 text-slate-400 hover:text-indigo-600 rounded transition" title="Edit">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="promptDelete('${t.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded transition" title="Delete">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Conditional Subtotal Row
+            if (filtered.length > 0 && isDescFiltered) {
+                const subTr = document.createElement('tr');
+                subTr.className = 'bg-slate-100 font-semibold text-slate-800 border-t-2 border-slate-200';
+                subTr.innerHTML = `
+                    <td colspan="3" class="py-3 px-4 text-right text-xs uppercase font-bold text-slate-700">Subtotal (${escapeHTML(descVal)}):</td>
+                    <td class="py-3 px-4 text-right font-bold text-slate-900 whitespace-nowrap">${formatPHP(subtotalAmount)}</td>
+                    <td colspan="3"></td>
+                `;
+                tbody.appendChild(subTr);
+            }
+
+            lucide.createIcons();
+        }
+
+        function editTransaction(id) {
+            const item = transactions.find(t => t.id === id);
+            if (!item) return;
+            document.getElementById('edit-id').value = item.id;
+            document.getElementById('input-date').value = item.date;
+            document.getElementById('input-type').value = item.type;
+            
+            updateCategoryDropdown();
+            document.getElementById('input-category').value = item.category;
+            
+            document.getElementById('input-amount').value = item.amount;
+            document.getElementById('input-description').value = item.description;
+            document.getElementById('input-remarks').value = item.remarks;
+            
+            const incomeSourceGroup = document.getElementById('income-source-group');
+            const incomeSourceInput = document.getElementById('input-income-source');
+            if (item.incomeSource) {
+                incomeSourceGroup.classList.remove('hidden');
+                incomeSourceInput.value = item.incomeSource;
+            } else {
+                incomeSourceGroup.classList.add('hidden');
+                incomeSourceInput.value = '';
+            }
+
+            document.getElementById('form-title').textContent = 'Edit Transaction';
+            document.getElementById('btn-submit').innerHTML = `<i data-lucide="check" class="w-4 h-4 mr-1.5"></i> Update Transaction`;
+            
+            const formCard = document.getElementById('form-card') || document.getElementById('form-title');
+            const headerOffset = 90;
+            const elementPosition = formCard.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+            window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+            lucide.createIcons();
+        }
+
+        function deleteTransaction(id) {
+            const item = transactions.find(t => t.id === id);
+            if (!item) return;
+            
+            let idsToRemove = [id];
+            if (item.deductionId) {
+                idsToRemove.push(item.deductionId);
+            }
+            transactions.forEach(t => {
+                if (t.deductionId === id) {
+                    idsToRemove.push(t.id);
+                }
+            });
+
+            transactions = transactions.filter(t => !idsToRemove.includes(t.id));
+            showToast('Transaction and related allocations deleted!', 'success');
+    
+            populateMonthFilter();
+            populateDescriptionFilter();
+            renderDashboard();
+        }
+
+        function promptDelete(id) {
+            pendingDeleteId = id;
+            document.getElementById('delete-modal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            pendingDeleteId = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        document.getElementById('confirm-delete-btn').onclick = function() {
+            if (pendingDeleteId) {
+                deleteTransaction(pendingDeleteId);
+                closeDeleteModal();
+            }
+        };
+
+        function exportJSON() {
+            if (transactions.length === 0) {
+                showToast('No transaction data to export.', 'error');
+                return;
+            }
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(transactions, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `FinanJAL_Standing_Backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('JSON backup file exported successfully!', 'success');
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        transactions = importedData;
+                        populateMonthFilter();
+                        populateDescriptionFilter();
+                        renderDashboard();
+                        showToast('JSON backup restored successfully!', 'success');
+                    } else {
+                        showToast('Invalid JSON file structure.', 'error');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('Failed to parse JSON file.', 'error');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function exportCSV() {
+            if (transactions.length === 0) {
+                showToast('No data available to export.', 'error');
+                return;
+            }
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Date,Type,Category,Amount (PHP),Description,Remarks\n";
+            transactions.forEach(t => {
+                const desc = `"${(t.description || '').replace(/"/g, '""')}"`;
+                const rem = `"${(t.remarks || '').replace(/"/g, '""')}"`;
+                csvContent += `${t.date},${t.type},${t.category},${t.amount},${desc},${rem}\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `FinanJAL_Standing_Transactions_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('CSV export downloaded successfully!', 'success');
+        }
+
+        function exportDashboardImage() {
+            const element = document.getElementById('dashboard-container');
+            showToast('Preparing visual report...', 'info');
+            html2canvas(element, {
+                scale: 2,
+                backgroundColor: '#f8fafc',
+                logging: false,
+                useCORS: true
+            }).then(canvas => {
+                const image = canvas.toDataURL("image/png");
+                const link = document.createElement('a');
+                link.download = `FinanJAL_Standing_Report_${new Date().toISOString().split('T')[0]}.png`;
+                link.href = image;
+                link.click();
+                showToast('Dashboard report image exported!', 'success');
+            }).catch(err => {
+                console.error(err);
+                showToast('Failed to export image report.', 'error');
+            });
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = 'bg-slate-800 text-white';
+            let icon = 'info';
+            if (type === 'success') {
+                bgClass = 'bg-emerald-600 text-white';
+                icon = 'check-circle';
+            } else if (type === 'error') {
+                bgClass = 'bg-rose-600 text-white';
+                icon = 'alert-circle';
+            }
+            toast.className = `flex items-center space-x-2 px-4 py-3 rounded-xl shadow-lg text-xs font-semibold transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto ${bgClass}`;
+            toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4"></i><span>${message}</span>`;
+            
+            container.appendChild(toast);
+            lucide.createIcons();
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 50);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'\"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+    </script>
+</body>
+</html>
