@@ -272,7 +272,7 @@
                         </select>
                     </div>
                     <div id="income-source-group" class="hidden">
-                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Deduct From Income Source</label>
+                        <label class="block text-xs font-semibold uppercase text-slate-600 mb-1">Deduct From Income Source (Source)</label>
                         <select id="input-income-source" class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
                             <option value="" disabled selected>Select income source</option>
                             <option value="Salary">Salary</option>
@@ -516,7 +516,8 @@
                 categorySelect.appendChild(opt);
             });
             
-            if (['Investment Fund', 'Savings Fund', 'Emergency Fund'].includes(type)) {
+            // Show income source deduction selector for Funds and Expenses
+            if (['Investment Fund', 'Savings Fund', 'Emergency Fund', 'Expense'].includes(type)) {
                 incomeSourceGroup.classList.remove('hidden');
             } else {
                 incomeSourceGroup.classList.add('hidden');
@@ -540,13 +541,13 @@
                 showToast('Please fill all required fields correctly.', 'error');
                 return;
             }
-            const isFund = ['Investment Fund', 'Savings Fund', 'Emergency Fund'].includes(type);
+            const requiresDeduction = ['Investment Fund', 'Savings Fund', 'Emergency Fund', 'Expense'].includes(type);
             if (editId) {
                 const index = transactions.findIndex(t => t.id === editId);
                 if (index !== -1) {
                     const oldTransaction = transactions[index];
                     let deductionId = oldTransaction.deductionId;
-                    if (isFund && incomeSource) {
+                    if (requiresDeduction && incomeSource) {
                         if (deductionId) {
                             const dedIndex = transactions.findIndex(t => t.id === deductionId);
                             if (dedIndex !== -1) {
@@ -596,7 +597,7 @@
                         amount,
                         description: description || category,
                         remarks: remarks || '-',
-                        incomeSource: isFund ? incomeSource : undefined,
+                        incomeSource: requiresDeduction ? incomeSource : undefined,
                         deductionId: deductionId || undefined
                     };
                     showToast('Transaction and allocation updated successfully!', 'success');
@@ -604,7 +605,7 @@
             } else {
                 const newId = Date.now().toString();
                 let deductionId = null;
-                if (isFund && incomeSource) {
+                if (requiresDeduction && incomeSource) {
                     deductionId = (Date.now() + 1).toString();
                     transactions.unshift({
                         id: deductionId,
@@ -624,7 +625,7 @@
                     amount,
                     description: description || category,
                     remarks: remarks || '-',
-                    incomeSource: isFund ? incomeSource : undefined,
+                    incomeSource: requiresDeduction ? incomeSource : undefined,
                     deductionId: deductionId || undefined
                 });
                 showToast('New transaction added successfully!', 'success');
