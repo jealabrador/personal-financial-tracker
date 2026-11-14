@@ -354,8 +354,12 @@
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                             <i data-lucide="search" class="w-4 h-4"></i>
                         </div>
-                        <input type="text" id="table-search" onkeyup="renderTable()" placeholder="Search description..." class="pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-48 sm:w-64">
+                        <input type="text" id="table-search" onkeyup="renderTable()" placeholder="Search description..." class="pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-40 sm:w-52">
                     </div>
+                    <!-- Specific Day Dropdown Filter -->
+                    <select id="filter-date" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
+                        <option value="ALL">All Dates</option>
+                    </select>
                     <!-- Description Filter Dropdown -->
                     <select id="filter-description" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
                         <option value="ALL">All Descriptions</option>
@@ -492,6 +496,7 @@
             }
             document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
             populateMonthFilter();
+            populateDateFilter();
             populateDescriptionFilter();
             renderDashboard();
             lucide.createIcons();
@@ -632,6 +637,7 @@
             saveToLocalStorage();
             resetForm();
             populateMonthFilter();
+            populateDateFilter();
             populateDescriptionFilter();
             renderDashboard();
         }
@@ -648,25 +654,40 @@
         function populateMonthFilter() {
             const monthSelect = document.getElementById('filter-month');
             const currentValue = monthSelect.value;
-            const dates = new Set();
+            const months = new Set();
             transactions.forEach(t => {
-                if (t.date) dates.add(t.date); // Specific Day (YYYY-MM-DD)
+                if (t.date) months.add(t.date.substring(0, 7));
             });
-            const sortedDates = Array.from(dates).sort().reverse();
+            const sortedMonths = Array.from(months).sort().reverse();
             
             monthSelect.innerHTML = '<option value="ALL">All Time Summary</option>';
-            sortedDates.forEach(d => {
-                const [year, month, day] = d.split('-');
-                const dateObj = new Date(year, month - 1, day);
-                const dateName = dateObj.toLocaleString('default', { month: 'long', day: 'numeric', year: 'numeric' });
+            sortedMonths.forEach(m => {
+                const [year, month] = m.split('-');
+                const dateObj = new Date(year, month - 1);
+                const monthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
                 const opt = document.createElement('option');
-                opt.value = d;
-                opt.textContent = dateName;
+                opt.value = m;
+                opt.textContent = monthName;
                 monthSelect.appendChild(opt);
             });
             if (Array.from(monthSelect.options).some(o => o.value === currentValue)) {
                 monthSelect.value = currentValue;
             }
+        }
+        function populateDateFilter() {
+            const dateSelect = document.getElementById('filter-date');
+            if (!dateSelect) return;
+            const currentValue = dateSelect.value;
+            const dates = [...new Set(transactions.map(t => t.date).filter(Boolean))].sort().reverse();
+            
+            dateSelect.innerHTML = '<option value="ALL">All Dates</option>';
+            dates.forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d;
+                opt.textContent = d;
+                if (d === currentValue) opt.selected = true;
+                dateSelect.appendChild(opt);
+            });
         }
         function populateDescriptionFilter() {
             const descSelect = document.getElementById('filter-description');
@@ -686,15 +707,17 @@
         function resetFilters() {
             document.getElementById('filter-month').value = 'ALL';
             document.getElementById('table-search').value = '';
+            const dateFilterEl = document.getElementById('filter-date');
+            if (dateFilterEl) dateFilterEl.value = 'ALL';
             document.getElementById('filter-description').value = 'ALL';
             document.getElementById('table-type-filter').value = 'ALL';
             renderDashboard();
         }
         function renderDashboard() {
-            const selectedDate = document.getElementById('filter-month').value;
-            const filtered = selectedDate === 'ALL' 
+            const selectedMonth = document.getElementById('filter-month').value;
+            const filtered = selectedMonth === 'ALL' 
                 ? transactions 
-                : transactions.filter(t => t.date && t.date === selectedDate);
+                : transactions.filter(t => t.date && t.date.startsWith(selectedMonth));
             let totalIncome = 0, totalExpense = 0, totalInvestment = 0, totalSavings = 0, totalEmergency = 0;
             let tierOneEmergency = 0, tierTwoEmergency = 0;
             filtered.forEach(t => {
@@ -840,18 +863,20 @@
             const emptyState = document.getElementById('empty-state');
             const searchVal = document.getElementById('table-search').value.toLowerCase();
             const typeVal = document.getElementById('table-type-filter').value;
-            const dateVal = document.getElementById('filter-month').value;
+            const monthVal = document.getElementById('filter-month').value;
+            const dateVal = document.getElementById('filter-date') ? document.getElementById('filter-date').value : 'ALL';
             const descVal = document.getElementById('filter-description') ? document.getElementById('filter-description').value : 'ALL';
             
             tbody.innerHTML = '';
             const filtered = transactions.filter(t => {
-                const matchesDate = dateVal === 'ALL' || (t.date && t.date === dateVal);
+                const matchesMonth = monthVal === 'ALL' || (t.date && t.date.startsWith(monthVal));
+                const matchesDate = dateVal === 'ALL' || t.date === dateVal;
                 const matchesType = typeVal === 'ALL' || t.type === typeVal;
                 const matchesDesc = descVal === 'ALL' || t.description === descVal;
                 const matchesSearch = (t.description && t.description.toLowerCase().includes(searchVal)) ||
                                       (t.remarks && t.remarks.toLowerCase().includes(searchVal)) ||
                                       (t.category && t.category.toLowerCase().includes(searchVal));
-                return matchesDate && matchesType && matchesDesc && matchesSearch;
+                return matchesMonth && matchesDate && matchesType && matchesDesc && matchesSearch;
             });
             if (filtered.length === 0) {
                 emptyState.classList.remove('hidden');
@@ -963,6 +988,7 @@
             showToast('Transaction and related allocations deleted!', 'success');
     
             populateMonthFilter();
+            populateDateFilter();
             populateDescriptionFilter();
             renderDashboard();
         }
@@ -1005,6 +1031,7 @@
                         transactions = importedData;
                         saveToLocalStorage();
                         populateMonthFilter();
+                        populateDateFilter();
                         populateDescriptionFilter();
                         renderDashboard();
                         showToast('JSON backup restored successfully!', 'success');
