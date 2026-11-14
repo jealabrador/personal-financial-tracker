@@ -282,7 +282,7 @@
                         <p class="text-[11px] text-slate-400 mt-1">Selecting this will log a matching deduction line item.</p>
                     </div>
                     <div>
-                        <label id="category-label" class="block text-xs font-semibold uppercase text-slate-600 mb-1">Category / Source</label>
+                        <label id="category-label" class="block text-xs font-semibold uppercase text-slate-600 mb-1">Category</label>
                         <select id="input-category" required class="w-full text-sm bg-slate-50 border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
                             <option value="" disabled selected>First choose a type above</option>
                         </select>
@@ -321,7 +321,6 @@
                             <i data-lucide="donut" class="w-5 h-5 text-indigo-500"></i>
                             Category Distribution Breakdown
                         </h3>
-                        <span class="text-xs text-slate-400">Donut Chart</span>
                     </div>
                     <div class="relative h-64 w-full flex items-center justify-center">
                         <canvas id="categoryChart"></canvas>
@@ -345,26 +344,20 @@
             <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h2 class="text-lg font-bold text-slate-800">Transaction History</h2>
-                    <p class="text-xs text-slate-500">Detailed list of recorded income, expenses, and funds</p>
                 </div>
                 
-                <!-- Table Search & Filters -->
+                <!-- Table Search & Filters (Single Row) -->
                 <div class="flex flex-wrap items-center gap-3">
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                             <i data-lucide="search" class="w-4 h-4"></i>
                         </div>
-                        <input type="text" id="table-search" onkeyup="renderTable()" placeholder="Search description..." class="pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-40 sm:w-52">
+                        <input type="text" id="table-search" onkeyup="renderTable()" placeholder="Search" class="pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-36 sm:w-48">
                     </div>
-                    <!-- Specific Day Dropdown Filter -->
                     <select id="filter-date" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
                         <option value="ALL">All Dates</option>
                     </select>
-                    <!-- Description Filter Dropdown -->
-                    <select id="filter-description" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
-                        <option value="ALL">All Descriptions</option>
-                    </select>
-                    <select id="table-type-filter" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
+                    <select id="filter-type" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
                         <option value="ALL">All Types</option>
                         <option value="Income">Income</option>
                         <option value="Expense">Expense</option>
@@ -372,6 +365,15 @@
                         <option value="Savings Fund">Savings Fund</option>
                         <option value="Emergency Fund">Emergency Fund</option>
                     </select>
+                    <select id="filter-category" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
+                        <option value="ALL">All Categories</option>
+                    </select>
+                    <select id="filter-description" onchange="renderTable()" class="text-xs bg-slate-50 border border-slate-300 text-slate-700 rounded-lg p-2">
+                        <option value="ALL">All Descriptions</option>
+                    </select>
+                    <button onclick="resetTableFilters()" class="p-2 text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-lg transition-all border border-slate-300 shadow-sm flex items-center justify-center" title="Reset Filter">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4 text-slate-500"></i>
+                    </button>
                 </div>
             </div>
             <!-- Table Container -->
@@ -381,7 +383,7 @@
                         <tr>
                             <th class="py-3.5 px-4">Date</th>
                             <th class="py-3.5 px-4">Type</th>
-                            <th class="py-3.5 px-4">Category / Choice</th>
+                            <th class="py-3.5 px-4">Category</th>
                             <th class="py-3.5 px-4 text-right">Amount</th>
                             <th class="py-3.5 px-4">Description</th>
                             <th class="py-3.5 px-4">Remarks</th>
@@ -496,8 +498,7 @@
             }
             document.getElementById('input-date').value = new Date().toISOString().split('T')[0];
             populateMonthFilter();
-            populateDateFilter();
-            populateDescriptionFilter();
+            populateTopFilters();
             renderDashboard();
             lucide.createIcons();
         };
@@ -513,7 +514,7 @@
                 if (incomeSourceGroup) incomeSourceGroup.classList.add('hidden');                
                 return;
             }
-            categoryLabel.textContent = `${type} Category`;
+            categoryLabel.textContent = `Category`;
             CATEGORY_MAP[type].forEach(cat => {
                 const opt = document.createElement('option');
                 opt.value = cat;
@@ -637,8 +638,7 @@
             saveToLocalStorage();
             resetForm();
             populateMonthFilter();
-            populateDateFilter();
-            populateDescriptionFilter();
+            populateTopFilters();
             renderDashboard();
         }
         function resetForm() {
@@ -674,44 +674,37 @@
                 monthSelect.value = currentValue;
             }
         }
-        function populateDateFilter() {
-            const dateSelect = document.getElementById('filter-date');
-            if (!dateSelect) return;
-            const currentValue = dateSelect.value;
-            const dates = [...new Set(transactions.map(t => t.date).filter(Boolean))].sort().reverse();
-            
-            dateSelect.innerHTML = '<option value="ALL">All Dates</option>';
-            dates.forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d;
-                opt.textContent = d;
-                if (d === currentValue) opt.selected = true;
-                dateSelect.appendChild(opt);
-            });
-        }
-        function populateDescriptionFilter() {
-            const descSelect = document.getElementById('filter-description');
-            if (!descSelect) return;
-            const currentValue = descSelect.value;
-            const descriptions = [...new Set(transactions.map(t => t.description).filter(Boolean))].sort();
-            
-            descSelect.innerHTML = '<option value="ALL">All Descriptions</option>';
-            descriptions.forEach(desc => {
-                const opt = document.createElement('option');
-                opt.value = desc;
-                opt.textContent = desc;
-                if (desc === currentValue) opt.selected = true;
-                descSelect.appendChild(opt);
-            });
+        function populateTopFilters() {
+            const populateDropdown = (elementId, values, defaultLabel) => {
+                const select = document.getElementById(elementId);
+                if (!select) return;
+                const currentVal = select.value;
+                const uniqueValues = [...new Set(values.filter(Boolean))].sort();
+                select.innerHTML = `<option value="ALL">${defaultLabel}</option>`;
+                uniqueValues.forEach(val => {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.textContent = val;
+                    if (val === currentVal) opt.selected = true;
+                    select.appendChild(opt);
+                });
+            };
+
+            populateDropdown('filter-date', transactions.map(t => t.date), 'All Dates');
+            populateDropdown('filter-category', transactions.map(t => t.category), 'All Categories');
+            populateDropdown('filter-description', transactions.map(t => t.description), 'All Descriptions');
         }
         function resetFilters() {
             document.getElementById('filter-month').value = 'ALL';
+            resetTableFilters();
+        }
+        function resetTableFilters() {
             document.getElementById('table-search').value = '';
-            const dateFilterEl = document.getElementById('filter-date');
-            if (dateFilterEl) dateFilterEl.value = 'ALL';
+            document.getElementById('filter-date').value = 'ALL';
+            document.getElementById('filter-type').value = 'ALL';
+            document.getElementById('filter-category').value = 'ALL';
             document.getElementById('filter-description').value = 'ALL';
-            document.getElementById('table-type-filter').value = 'ALL';
-            renderDashboard();
+            renderTable();
         }
         function renderDashboard() {
             const selectedMonth = document.getElementById('filter-month').value;
@@ -862,9 +855,11 @@
             const tbody = document.getElementById('transaction-table-body');
             const emptyState = document.getElementById('empty-state');
             const searchVal = document.getElementById('table-search').value.toLowerCase();
-            const typeVal = document.getElementById('table-type-filter').value;
             const monthVal = document.getElementById('filter-month').value;
+            
             const dateVal = document.getElementById('filter-date') ? document.getElementById('filter-date').value : 'ALL';
+            const typeVal = document.getElementById('filter-type') ? document.getElementById('filter-type').value : 'ALL';
+            const catVal = document.getElementById('filter-category') ? document.getElementById('filter-category').value : 'ALL';
             const descVal = document.getElementById('filter-description') ? document.getElementById('filter-description').value : 'ALL';
             
             tbody.innerHTML = '';
@@ -872,11 +867,18 @@
                 const matchesMonth = monthVal === 'ALL' || (t.date && t.date.startsWith(monthVal));
                 const matchesDate = dateVal === 'ALL' || t.date === dateVal;
                 const matchesType = typeVal === 'ALL' || t.type === typeVal;
+                const matchesCat = catVal === 'ALL' || t.category === catVal;
                 const matchesDesc = descVal === 'ALL' || t.description === descVal;
-                const matchesSearch = (t.description && t.description.toLowerCase().includes(searchVal)) ||
+                
+                const matchesSearch = !searchVal || 
+                                      (t.date && t.date.toLowerCase().includes(searchVal)) ||
+                                      (t.type && t.type.toLowerCase().includes(searchVal)) ||
+                                      (t.category && t.category.toLowerCase().includes(searchVal)) ||
+                                      (t.description && t.description.toLowerCase().includes(searchVal)) ||
                                       (t.remarks && t.remarks.toLowerCase().includes(searchVal)) ||
-                                      (t.category && t.category.toLowerCase().includes(searchVal));
-                return matchesMonth && matchesDate && matchesType && matchesDesc && matchesSearch;
+                                      (t.amount && t.amount.toString().toLowerCase().includes(searchVal));
+
+                return matchesMonth && matchesDate && matchesType && matchesCat && matchesDesc && matchesSearch;
             });
             if (filtered.length === 0) {
                 emptyState.classList.remove('hidden');
@@ -988,8 +990,7 @@
             showToast('Transaction and related allocations deleted!', 'success');
     
             populateMonthFilter();
-            populateDateFilter();
-            populateDescriptionFilter();
+            populateTopFilters();
             renderDashboard();
         }
         function promptDelete(id) {
@@ -1031,8 +1032,7 @@
                         transactions = importedData;
                         saveToLocalStorage();
                         populateMonthFilter();
-                        populateDateFilter();
-                        populateDescriptionFilter();
+                        populateTopFilters();
                         renderDashboard();
                         showToast('JSON backup restored successfully!', 'success');
                     } else {
