@@ -516,7 +516,6 @@
                 categorySelect.appendChild(opt);
             });
             
-            // Show income source deduction selector for Funds and Expenses
             if (['Investment Fund', 'Savings Fund', 'Emergency Fund', 'Expense'].includes(type)) {
                 incomeSourceGroup.classList.remove('hidden');
             } else {
@@ -649,20 +648,20 @@
         function populateMonthFilter() {
             const monthSelect = document.getElementById('filter-month');
             const currentValue = monthSelect.value;
-            const months = new Set();
+            const dates = new Set();
             transactions.forEach(t => {
-                if (t.date) months.add(t.date.substring(0, 7));
+                if (t.date) dates.add(t.date); // Specific Day (YYYY-MM-DD)
             });
-            const sortedMonths = Array.from(months).sort().reverse();
+            const sortedDates = Array.from(dates).sort().reverse();
             
             monthSelect.innerHTML = '<option value="ALL">All Time Summary</option>';
-            sortedMonths.forEach(m => {
-                const [year, month] = m.split('-');
-                const dateObj = new Date(year, month - 1);
-                const monthName = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+            sortedDates.forEach(d => {
+                const [year, month, day] = d.split('-');
+                const dateObj = new Date(year, month - 1, day);
+                const dateName = dateObj.toLocaleString('default', { month: 'long', day: 'numeric', year: 'numeric' });
                 const opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = monthName;
+                opt.value = d;
+                opt.textContent = dateName;
                 monthSelect.appendChild(opt);
             });
             if (Array.from(monthSelect.options).some(o => o.value === currentValue)) {
@@ -692,10 +691,10 @@
             renderDashboard();
         }
         function renderDashboard() {
-            const selectedMonth = document.getElementById('filter-month').value;
-            const filtered = selectedMonth === 'ALL' 
+            const selectedDate = document.getElementById('filter-month').value;
+            const filtered = selectedDate === 'ALL' 
                 ? transactions 
-                : transactions.filter(t => t.date && t.date.startsWith(selectedMonth));
+                : transactions.filter(t => t.date && t.date === selectedDate);
             let totalIncome = 0, totalExpense = 0, totalInvestment = 0, totalSavings = 0, totalEmergency = 0;
             let tierOneEmergency = 0, tierTwoEmergency = 0;
             filtered.forEach(t => {
@@ -841,18 +840,18 @@
             const emptyState = document.getElementById('empty-state');
             const searchVal = document.getElementById('table-search').value.toLowerCase();
             const typeVal = document.getElementById('table-type-filter').value;
-            const monthVal = document.getElementById('filter-month').value;
+            const dateVal = document.getElementById('filter-month').value;
             const descVal = document.getElementById('filter-description') ? document.getElementById('filter-description').value : 'ALL';
             
             tbody.innerHTML = '';
             const filtered = transactions.filter(t => {
-                const matchesMonth = monthVal === 'ALL' || (t.date && t.date.startsWith(monthVal));
+                const matchesDate = dateVal === 'ALL' || (t.date && t.date === dateVal);
                 const matchesType = typeVal === 'ALL' || t.type === typeVal;
                 const matchesDesc = descVal === 'ALL' || t.description === descVal;
                 const matchesSearch = (t.description && t.description.toLowerCase().includes(searchVal)) ||
                                       (t.remarks && t.remarks.toLowerCase().includes(searchVal)) ||
                                       (t.category && t.category.toLowerCase().includes(searchVal));
-                return matchesMonth && matchesType && matchesDesc && matchesSearch;
+                return matchesDate && matchesType && matchesDesc && matchesSearch;
             });
             if (filtered.length === 0) {
                 emptyState.classList.remove('hidden');
